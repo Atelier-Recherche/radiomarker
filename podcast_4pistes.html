@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reaper Podcast Control</title>
+    <style>
+        html, body { height: 100%; }
+        body {
+            background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif;
+            margin: 0; padding: 10px; box-sizing: border-box;
+            display: flex; flex-direction: column; min-height: 80vh;
+        }
+        * { box-sizing: border-box; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .topbar-title { font-size: 14px; color: #aaa; text-transform: uppercase; }
+        .btn-settings { width: auto; padding: 8px 12px; margin: 0; background: #4b5563; color: white; font-size: 11px; }
+        .settings-panel { display: none; margin-bottom: 10px; padding: 10px; border: 1px solid #444; border-radius: 10px; background: #202020; max-height: 48vh; overflow: auto; }
+        .settings-panel.open { display: block; }
+        .settings-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .toolbar-btn { padding: 8px 10px; margin: 0; font-size: 11px; }
+        .lock-on { background: #7f1d1d; color: #fff; }
+        .lock-off { background: #14532d; color: #fff; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .settings-card { border: 1px solid #3d3d3d; border-radius: 8px; padding: 8px; background: #292929; }
+        .settings-card h4 { margin: 0 0 8px 0; font-size: 12px; color: #ddd; }
+        .field { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: #bbb; }
+        .field input[type="text"] { width: 56%; padding: 4px 6px; border: 1px solid #555; border-radius: 6px; background: #111; color: #fff; }
+        .field input[type="color"] { width: 46px; height: 28px; border: none; background: transparent; }
+        .field input[disabled] { opacity: 0.45; }
+        .grid-container {
+            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+            gap: 10px; flex: 1; min-height: 0;
+        }
+        .piste-box {
+            border: 1px solid #444; padding: 10px; border-radius: 10px; background: #252525;
+            display: flex; flex-direction: column; min-height: 0;
+        }
+        .piste-box.hidden { display: none; }
+        h3 { margin: 0 0 10px 0; font-size: clamp(14px, 2vw, 18px); text-align: center; color: #aaa; text-transform: uppercase; }
+        
+        button {
+            width: 100%; margin-bottom: 8px; padding: 15px 8px; border: none;
+            border-radius: 8px; font-weight: bold; cursor: pointer; font-size: clamp(12px, 2vw, 20px);
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.5; }
+        .marker-btn { flex: 1; min-height: 0; }
+
+        /* Couleurs des boutons */
+        .btn-custom { background: #3498db; color: white; } /* Bleu : Nommé */
+        .btn-error  { background: #e74c3c; color: white; } /* Rouge : Erreur */
+        .btn-ref    { background: #f1c40f; color: black; } /* Jaune : Référence */
+
+        .footer { text-align: center; font-size: 10px; color: #555; margin-top: 10px; }
+        @media (max-width: 720px) {
+            .settings-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="topbar-title">Reaper Podcast Control</div>
+    <button class="btn-settings" onclick="toggleSettings()">PARAMETRES</button>
+</div>
+
+<div id="settingsPanel" class="settings-panel"></div>
+
+<div class="grid-container">
+    <div id="box_P1" class="piste-box">
+        <h3 id="title1">Intervenant 1</h3>
+        <button id="btn_P1_NOM" class="btn-custom marker-btn" onclick="sendMarker('P1_NOM')">NOMMER</button>
+        <button id="btn_P1_ERR" class="btn-error marker-btn" onclick="sendMarker('P1_ERR')">ERREUR SON</button>
+        <button id="btn_P1_REF" class="btn-ref marker-btn" onclick="sendMarker('P1_REF')">REF / CITATION</button>
+    </div>
+
+    <div id="box_P2" class="piste-box">
+        <h3 id="title2">Intervenant 2</h3>
+        <button id="btn_P2_NOM" class="btn-custom marker-btn" onclick="sendMarker('P2_NOM')">NOMMER</button>
+        <button id="btn_P2_ERR" class="btn-error marker-btn" onclick="sendMarker('P2_ERR')">ERREUR SON</button>
+        <button id="btn_P2_REF" class="btn-ref marker-btn" onclick="sendMarker('P2_REF')">REF / CITATION</button>
+    </div>
+
+    <div id="box_P3" class="piste-box">
+        <h3 id="title3">Intervenant 3</h3>
+        <button id="btn_P3_NOM" class="btn-custom marker-btn" onclick="sendMarker('P3_NOM')">NOMMER</button>
+        <button id="btn_P3_ERR" class="btn-error marker-btn" onclick="sendMarker('P3_ERR')">ERREUR SON</button>
+        <button id="btn_P3_REF" class="btn-ref marker-btn" onclick="sendMarker('P3_REF')">REF / CITATION</button>
+    </div>
+
+    <div id="box_P4" class="piste-box">
+        <h3 id="title4">Intervenant 4</h3>
+        <button id="btn_P4_NOM" class="btn-custom marker-btn" onclick="sendMarker('P4_NOM')">NOMMER</button>
+        <button id="btn_P4_ERR" class="btn-error marker-btn" onclick="sendMarker('P4_ERR')">ERREUR SON</button>
+        <button id="btn_P4_REF" class="btn-ref marker-btn" onclick="sendMarker('P4_REF')">REF / CITATION</button>
+    </div>
+</div>
+
+<div class="footer">Connecté à Reaper via Web Interface</div>
+
+<script src="main.js"></script>
+<script>
+    const defaultSettings = {
+        P1_NAME: "Intervenant 1", P1_VISIBLE: true, P1_ERR_COLOR: "#ff0000", P1_REF_COLOR: "#ffff00", P1_NOM_COLOR: "#ff8c00",
+        P2_NAME: "Intervenant 2", P2_VISIBLE: true, P2_ERR_COLOR: "#ff0000", P2_REF_COLOR: "#ffff00", P2_NOM_COLOR: "#ff8c00",
+        P3_NAME: "Intervenant 3", P3_VISIBLE: true, P3_ERR_COLOR: "#ff0000", P3_REF_COLOR: "#ffff00", P3_NOM_COLOR: "#ff8c00",
+        P4_NAME: "Intervenant 4", P4_VISIBLE: true, P4_ERR_COLOR: "#ff0000", P4_REF_COLOR: "#ffff00", P4_NOM_COLOR: "#ff8c00",
+        UI_LOCKED: false,
+        _updatedAt: 0
+    };
+    let settings = {};
+    let lastRemoteSyncAt = 0;
+
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem("radiomarker_settings");
+            settings = raw ? Object.assign({}, defaultSettings, JSON.parse(raw)) : Object.assign({}, defaultSettings);
+        } catch (e) {
+            settings = Object.assign({}, defaultSettings);
+        }
+    }
+
+    function saveSettings() {
+        settings._updatedAt = Date.now();
+        localStorage.setItem("radiomarker_settings", JSON.stringify(settings));
+        pushSharedSettingsToReaper();
+    }
+
+    function renderTitles() {
+        document.getElementById("title1").textContent = settings.P1_NAME || defaultSettings.P1_NAME;
+        document.getElementById("title2").textContent = settings.P2_NAME || defaultSettings.P2_NAME;
+        document.getElementById("title3").textContent = settings.P3_NAME || defaultSettings.P3_NAME;
+        document.getElementById("title4").textContent = settings.P4_NAME || defaultSettings.P4_NAME;
+    }
+
+    function textColorForBackground(hex) {
+        const c = (hex || "#000000").replace("#", "");
+        const v = parseInt(c, 16);
+        const r = (v >> 16) & 255;
+        const g = (v >> 8) & 255;
+        const b = v & 255;
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return yiq >= 150 ? "#111111" : "#ffffff";
+    }
+
+    function renderButtonColors() {
+        for (let i = 1; i <= 4; i++) {
+            const p = "P" + i;
+            const map = {
+                NOM: settings[p + "_NOM_COLOR"] || defaultSettings[p + "_NOM_COLOR"],
+                ERR: settings[p + "_ERR_COLOR"] || defaultSettings[p + "_ERR_COLOR"],
+                REF: settings[p + "_REF_COLOR"] || defaultSettings[p + "_REF_COLOR"]
+            };
+            ["NOM", "ERR", "REF"].forEach(function(kind) {
+                const el = document.getElementById("btn_" + p + "_" + kind);
+                if (!el) return;
+                const bg = map[kind];
+                el.style.background = bg;
+                el.style.color = textColorForBackground(bg);
+            });
+        }
+    }
+
+    function countVisiblePeople() {
+        let count = 0;
+        for (let i = 1; i <= 4; i++) {
+            if (settings["P" + i + "_VISIBLE"] !== false) count++;
+        }
+        return count;
+    }
+
+    function applyVisibilityAndLayout() {
+        for (let i = 1; i <= 4; i++) {
+            const p = "P" + i;
+            const box = document.getElementById("box_" + p);
+            if (!box) continue;
+            const visible = settings[p + "_VISIBLE"] !== false;
+            box.classList.toggle("hidden", !visible);
+        }
+
+        const grid = document.querySelector(".grid-container");
+        const visibleCount = countVisiblePeople();
+        const isMobile = window.innerWidth <= 720;
+
+        if (isMobile) {
+            grid.style.gridTemplateColumns = "1fr";
+            grid.style.gridTemplateRows = "repeat(" + Math.max(1, visibleCount) + ", 1fr)";
+            return;
+        }
+
+        if (visibleCount <= 1) {
+            grid.style.gridTemplateColumns = "1fr";
+            grid.style.gridTemplateRows = "1fr";
+        } else if (visibleCount === 2) {
+            grid.style.gridTemplateColumns = "1fr 1fr";
+            grid.style.gridTemplateRows = "1fr";
+        } else {
+            grid.style.gridTemplateColumns = "1fr 1fr";
+            grid.style.gridTemplateRows = "1fr 1fr";
+        }
+    }
+
+    function renderSettingsPanel() {
+        const panel = document.getElementById("settingsPanel");
+        panel.innerHTML = `
+            <div class="settings-toolbar">
+                <button class="toolbar-btn ${settings.UI_LOCKED ? "lock-on" : "lock-off"}" onclick="toggleGlobalLock()">${settings.UI_LOCKED ? "LOCK ACTIF" : "LOCK INACTIF"}</button>
+                <button class="toolbar-btn" onclick="resetSession()">RESET SESSION</button>
+                <button class="toolbar-btn" onclick="applyProfilePrompt()">APPLIQUER PROFIL</button>
+                <button class="toolbar-btn" onclick="pullSharedSettingsFromReaper()">SYNC MAINTENANT</button>
+            </div>
+            <div class="settings-grid">
+                ${renderPersonSettings(1)}
+                ${renderPersonSettings(2)}
+                ${renderPersonSettings(3)}
+                ${renderPersonSettings(4)}
+            </div>
+        `;
+    }
+
+    function renderPersonSettings(i) {
+        const p = "P" + i;
+        return `
+            <div class="settings-card">
+                <h4>${p}</h4>
+                <div class="field"><span>Afficher</span><input type="checkbox" ${settings[p + "_VISIBLE"] !== false ? "checked" : ""} onchange="onSettingVisible('${p}_VISIBLE', this.checked)" /></div>
+                <div class="field"><span>Nom</span><input data-lockable="1" ${settings.UI_LOCKED ? "disabled" : ""} type="text" value="${escapeHtml(settings[p + "_NAME"])}" onchange="onSettingText('${p}_NAME', this.value)" /></div>
+                <div class="field"><span>Couleur Erreur</span><input data-lockable="1" ${settings.UI_LOCKED ? "disabled" : ""} type="color" value="${settings[p + "_ERR_COLOR"]}" onchange="onSettingColor('${p}_ERR_COLOR', this.value)" /></div>
+                <div class="field"><span>Couleur Citation</span><input data-lockable="1" ${settings.UI_LOCKED ? "disabled" : ""} type="color" value="${settings[p + "_REF_COLOR"]}" onchange="onSettingColor('${p}_REF_COLOR', this.value)" /></div>
+                <div class="field"><span>Couleur Nommer</span><input data-lockable="1" ${settings.UI_LOCKED ? "disabled" : ""} type="color" value="${settings[p + "_NOM_COLOR"]}" onchange="onSettingColor('${p}_NOM_COLOR', this.value)" /></div>
+            </div>
+        `;
+    }
+
+    function escapeHtml(text) {
+        return String(text || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function onSettingText(key, value) {
+        if (settings.UI_LOCKED) return;
+        const v = String(value || "").trim();
+        settings[key] = v || defaultSettings[key];
+        saveSettings();
+        renderTitles();
+    }
+
+    function onSettingColor(key, value) {
+        if (settings.UI_LOCKED) return;
+        settings[key] = value || defaultSettings[key];
+        saveSettings();
+        renderButtonColors();
+    }
+
+    function onSettingVisible(key, checked) {
+        settings[key] = !!checked;
+        if (countVisiblePeople() === 0) {
+            settings[key] = true;
+            renderSettingsPanel();
+            alert("Au moins un intervenant doit rester visible.");
+            return;
+        }
+        saveSettings();
+        applyVisibilityAndLayout();
+    }
+
+    function toggleSettings() {
+        document.getElementById("settingsPanel").classList.toggle("open");
+    }
+
+    function toggleGlobalLock() {
+        settings.UI_LOCKED = !settings.UI_LOCKED;
+        saveSettings();
+        renderSettingsPanel();
+    }
+
+    function resetSession() {
+        const keepVisibility = {
+            P1_VISIBLE: settings.P1_VISIBLE !== false,
+            P2_VISIBLE: settings.P2_VISIBLE !== false,
+            P3_VISIBLE: settings.P3_VISIBLE !== false,
+            P4_VISIBLE: settings.P4_VISIBLE !== false
+        };
+        settings = Object.assign({}, defaultSettings, keepVisibility, { _updatedAt: Date.now() });
+        saveSettings();
+        renderTitles();
+        renderButtonColors();
+        applyVisibilityAndLayout();
+        renderSettingsPanel();
+    }
+
+    function applyProfilePrompt() {
+        if (settings.UI_LOCKED) return;
+        const v = window.prompt("Profil: podcast / interview / plateau", "podcast");
+        if (v === null) return;
+        const key = String(v).trim().toLowerCase();
+        const profiles = {
+            podcast: { ERR: "#ff4d4d", REF: "#ffd400", NOM: "#ff8c00" },
+            interview: { ERR: "#e11d48", REF: "#22c55e", NOM: "#3b82f6" },
+            plateau: { ERR: "#ef4444", REF: "#f59e0b", NOM: "#8b5cf6" }
+        };
+        const p = profiles[key];
+        if (!p) {
+            alert("Profil inconnu.");
+            return;
+        }
+        for (let i = 1; i <= 4; i++) {
+            const base = "P" + i + "_";
+            settings[base + "ERR_COLOR"] = p.ERR;
+            settings[base + "REF_COLOR"] = p.REF;
+            settings[base + "NOM_COLOR"] = p.NOM;
+        }
+        saveSettings();
+        renderButtonColors();
+        renderSettingsPanel();
+    }
+
+    function normalizeCommandId(commandID) {
+        if (!commandID) return "";
+        if (commandID.startsWith("_RS")) return commandID;
+        if (commandID.startsWith("RS")) return "_" + commandID;
+        return commandID;
+    }
+
+    function getBridgeErrorHint() {
+        if (window.location.protocol === "file:") {
+            return "La page est ouverte en file://. Ouvre-la via le serveur web de Reaper (Control Path) pour charger main.js.";
+        }
+        return "Bridge Reaper introuvable (wwr_req absent). Verifie que main.js est bien charge.";
+    }
+
+    function sendToReaper(commandID) {
+        // API officielle de main.js (versions REAPER classiques)
+        if (typeof wwr_req === "function") {
+            if (typeof wwr_start === "function" && !window.__wwr_started) {
+                wwr_start();
+                window.__wwr_started = true;
+            }
+            wwr_req(commandID);
+            return true;
+        }
+
+        // Fallback brut sans main.js
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open("GET", "/_/" + commandID + ";", true);
+            xhr.send(null);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function normalizeIncomingSettings(obj) {
+        const merged = Object.assign({}, defaultSettings, obj || {});
+        if (typeof merged._updatedAt !== "number") merged._updatedAt = 0;
+        return merged;
+    }
+
+    function pushSharedSettingsToReaper() {
+        const payload = encodeURIComponent(JSON.stringify(settings));
+        const cmd = "SET/EXTSTATEPERSIST/" + encodeURIComponent("RADIO_MARKER_UI") + "/" + encodeURIComponent("SETTINGS") + "/" + payload;
+        sendToReaper(cmd);
+    }
+
+    function pullSharedSettingsFromReaper() {
+        sendToReaper("GET/EXTSTATE/" + encodeURIComponent("RADIO_MARKER_UI") + "/" + encodeURIComponent("SETTINGS"));
+    }
+
+    function applyRemoteSettingsIfNewer(remote) {
+        const normalized = normalizeIncomingSettings(remote);
+        if ((normalized._updatedAt || 0) <= (settings._updatedAt || 0)) return;
+        settings = normalized;
+        localStorage.setItem("radiomarker_settings", JSON.stringify(settings));
+        renderTitles();
+        renderButtonColors();
+        applyVisibilityAndLayout();
+        renderSettingsPanel();
+    }
+
+    function wwr_onreply(results) {
+        const lines = String(results || "").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const tok = lines[i].split("\t");
+            if (tok[0] === "EXTSTATE" && tok[1] === "RADIO_MARKER_UI" && tok[2] === "SETTINGS") {
+                const raw = (typeof simple_unescape === "function") ? simple_unescape(tok[3] || "") : (tok[3] || "");
+                if (!raw) continue;
+                try {
+                    const remote = JSON.parse(raw);
+                    applyRemoteSettingsIfNewer(remote);
+                    lastRemoteSyncAt = Date.now();
+                } catch (e) {
+                    console.warn("Settings distants invalides");
+                }
+            }
+        }
+    }
+
+    function sendMarker(type) {
+        // Remplis ces IDs avec ceux visibles dans la colonne "Command ID" de Reaper.
+        const commandMap = {
+            P1_NOM: "_RS75c0b4260d0e85df11befb6f3122b466b4c597c4",
+            P1_ERR: "_RS395d5795532b159d2df5bc66546fc6e16524bbf6",
+            P1_REF: "_RSe4f2d56142625022c9736b9505a6fec82d219d5f",
+            P2_NOM: "_RSea78e88b57a1712b73e9c79fbf895737ff742955",
+            P2_ERR: "_RS651b045b1be2c7fe85afc770151b87fe8e96551e",
+            P2_REF: "_RS5c975bf5f5daefe62922597f4142ed5f06847d05",
+            P3_NOM: "_RS62c72c6fc4167e8a4bbecf3b6a2fdd372a906f5e",
+            P3_ERR: "_RSae94ec08b9aeda544e7a89ffc6d11bae605476a7",
+            P3_REF: "_RS63f25e36b2745b35a03ae7855b2d74fb9dc657d2",
+            P4_NOM: "_RS40fa1a24a2690b097d9c1acd57515ff62d2f4189",
+            P4_ERR: "_RS7b65de09f233e8183b14e05c1506797f62246b87",
+            P4_REF: "_RS0ccae7228b142a2f2d9a381354a77ca8cff5ccb8"
+        };
+
+        const commandID = normalizeCommandId(commandMap[type]);
+
+        if (!commandID) {
+            console.warn("Aucun Command ID configuré pour :", type);
+            return;
+        }
+
+        const person = type.split("_")[0];
+        const extParts = [
+            "SET/EXTSTATE/" + encodeURIComponent("RADIO_MARKER") + "/" + encodeURIComponent(person + "_NAME") + "/" + encodeURIComponent(settings[person + "_NAME"] || ""),
+            "SET/EXTSTATE/" + encodeURIComponent("RADIO_MARKER") + "/" + encodeURIComponent(person + "_ERR_COLOR") + "/" + encodeURIComponent((settings[person + "_ERR_COLOR"] || "#ff0000").replace("#", "")),
+            "SET/EXTSTATE/" + encodeURIComponent("RADIO_MARKER") + "/" + encodeURIComponent(person + "_REF_COLOR") + "/" + encodeURIComponent((settings[person + "_REF_COLOR"] || "#ffff00").replace("#", "")),
+            "SET/EXTSTATE/" + encodeURIComponent("RADIO_MARKER") + "/" + encodeURIComponent(person + "_NOM_COLOR") + "/" + encodeURIComponent((settings[person + "_NOM_COLOR"] || "#ff8c00").replace("#", ""))
+        ];
+
+        let payload = extParts.join(";");
+        if (type.endsWith("_NOM")) {
+            const saisi = window.prompt("Texte du marqueur pour " + type.replace("_NOM", "") + " :", "");
+            if (saisi === null) return;
+
+            const cleaned = saisi.trim();
+            if (!cleaned) {
+                alert("Nom vide: rien envoye.");
+                return;
+            }
+
+            const section = encodeURIComponent("RADIO_MARKER");
+            const key = encodeURIComponent(type);
+            const value = encodeURIComponent(cleaned);
+            payload += ";SET/EXTSTATE/" + section + "/" + key + "/" + value;
+        }
+        payload += ";" + commandID;
+
+        if (sendToReaper(payload)) {
+            console.log("Commande envoyée :", type, commandID);
+        } else {
+            alert("Erreur : Liaison avec Reaper non trouvée.\n" + getBridgeErrorHint());
+        }
+    }
+
+    loadSettings();
+    renderTitles();
+    renderSettingsPanel();
+    renderButtonColors();
+    applyVisibilityAndLayout();
+    window.addEventListener("resize", applyVisibilityAndLayout);
+    setInterval(function() {
+        if (Date.now() - lastRemoteSyncAt > 3000) pullSharedSettingsFromReaper();
+    }, 4000);
+    pullSharedSettingsFromReaper();
+</script>
+
+</body>
+</html>
