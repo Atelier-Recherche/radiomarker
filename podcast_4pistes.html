@@ -109,6 +109,7 @@
         UI_LOCKED: false,
         _updatedAt: 0
     };
+    const localOnlyKeys = ["P1_VISIBLE", "P2_VISIBLE", "P3_VISIBLE", "P4_VISIBLE"];
     let settings = {};
     let lastRemoteSyncAt = 0;
 
@@ -125,6 +126,22 @@
         settings._updatedAt = Date.now();
         localStorage.setItem("radiomarker_settings", JSON.stringify(settings));
         pushSharedSettingsToReaper();
+    }
+
+    function getLocalOnlySettings(source) {
+        const localSettings = {};
+        localOnlyKeys.forEach(function(key) {
+            localSettings[key] = source[key] !== false;
+        });
+        return localSettings;
+    }
+
+    function buildSharedSettingsPayload(source) {
+        const sharedSettings = Object.assign({}, source);
+        localOnlyKeys.forEach(function(key) {
+            delete sharedSettings[key];
+        });
+        return sharedSettings;
     }
 
     function renderTitles() {
@@ -362,7 +379,7 @@
     }
 
     function pushSharedSettingsToReaper() {
-        const payload = encodeURIComponent(JSON.stringify(settings));
+        const payload = encodeURIComponent(JSON.stringify(buildSharedSettingsPayload(settings)));
         const cmd = "SET/EXTSTATEPERSIST/" + encodeURIComponent("RADIO_MARKER_UI") + "/" + encodeURIComponent("SETTINGS") + "/" + payload;
         sendToReaper(cmd);
     }
@@ -374,7 +391,7 @@
     function applyRemoteSettingsIfNewer(remote) {
         const normalized = normalizeIncomingSettings(remote);
         if ((normalized._updatedAt || 0) <= (settings._updatedAt || 0)) return;
-        settings = normalized;
+        settings = Object.assign({}, normalized, getLocalOnlySettings(settings));
         localStorage.setItem("radiomarker_settings", JSON.stringify(settings));
         renderTitles();
         renderButtonColors();
