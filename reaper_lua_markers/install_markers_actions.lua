@@ -17,6 +17,8 @@ local function join_path(a, b)
     return a .. sep .. b
 end
 
+local silent = _G.RADIOMARKER_SILENT == true
+
 local script_dir = get_script_dir()
 if not script_dir then
     reaper.ShowMessageBox("Impossible de determiner le dossier du script.", "Install markers actions", 0)
@@ -41,9 +43,9 @@ for i = 1, #files do
     if not reaper.file_exists(fullpath) then
         missing[#missing + 1] = filename
     else
-        -- sectionID 0 = section principale (Main)
-        local ok = reaper.AddRemoveReaScript(true, 0, fullpath, true)
-        if ok then
+        -- sectionID 0 = section principale (Main); retourne le command ID ou 0 si echec
+        local cmd_id = reaper.AddRemoveReaScript(true, 0, fullpath, true)
+        if cmd_id and cmd_id ~= 0 then
             installed[#installed + 1] = filename
         else
             failed[#failed + 1] = filename
@@ -67,4 +69,6 @@ local message =
     "Echecs (" .. #failed .. "):\n" .. join_lines(failed) .. "\n\n" ..
     "Ouvre ensuite la Liste des actions et cherche: p1_, p2_, p3_, p4_."
 
-reaper.ShowMessageBox(message, "Install markers actions", 0)
+if not silent then
+    reaper.ShowMessageBox(message, "Install markers actions", 0)
+end

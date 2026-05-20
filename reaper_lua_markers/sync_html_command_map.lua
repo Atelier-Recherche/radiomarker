@@ -49,6 +49,8 @@ local function command_id_for_script(path)
     return named
 end
 
+local silent = _G.RADIOMARKER_SILENT == true
+
 local script_dir = get_script_dir()
 if not script_dir then
     reaper.ShowMessageBox("Impossible de determiner le dossier du script.", "Sync HTML command map", 0)
@@ -142,4 +144,6 @@ local report = "Synchronisation terminee.\nHTML mis a jour:\n" .. html_path
 if #missing > 0 then
     report = report .. "\n\nElements manquants:\n- " .. table.concat(missing, "\n- ")
 end
-reaper.ShowMessageBox(report, "Sync HTML command map", 0)
+if not silent then
+    reaper.ShowMessageBox(report, "Sync HTML command map", 0)
+end
