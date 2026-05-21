@@ -151,7 +151,47 @@ function M.get_project_base_name()
     return name
 end
 
+function M.basename(path)
+    local name = path:match("([^/\\]+)$")
+    return name or path
+end
+
+function M.dirname(path)
+    local dir = path:match("^(.*)[/\\][^/\\]+$")
+    return dir or ""
+end
+
+function M.get_last_render_file()
+    local path = reaper.GetSetProjectInfo_String(0, "RENDER_FILE", "", false)
+    path = M.trim(path)
+    if path ~= "" and reaper.file_exists(path) then
+        return path
+    end
+    return nil
+end
+
+-- MP3 deja present (export manuel ou rendu precedent) : evite un second render
+function M.resolve_mp3_for_export(out_dir, mp3_name)
+    local expected = M.join_path(out_dir, mp3_name)
+    if reaper.file_exists(expected) then
+        return expected, mp3_name
+    end
+    local last = M.get_last_render_file()
+    if last then
+        local base = M.basename(last)
+        if base:lower():match("%.mp3$") or base:lower():match("%.wav$") or base:lower():match("%.flac$") then
+            return last, base
+        end
+    end
+    return nil, nil
+end
+
 function M.get_output_directory()
+    local last = M.get_last_render_file()
+    if last then
+        local dir = M.dirname(last)
+        if dir ~= "" then return dir end
+    end
     local proj_path = reaper.GetProjectPathName(0, "")
     proj_path = M.trim(proj_path)
     if proj_path ~= "" then
@@ -181,6 +221,10 @@ function M.write_utf8(path, content)
 end
 
 -- Render projet vers path (format MP3 via reglages render du projet)
+function M.md_path_for_mp3(mp3_path)
+    return (mp3_path:gsub("%.[^%.\\\/]+$", "") or mp3_path) .. ".md"
+end
+
 function M.render_project_to_file(output_path)
     reaper.GetSetProjectInfo_String(0, "RENDER_FILE", output_path, true)
     reaper.Main_OnCommand(42230, 0) -- Render project, recent settings, auto-close dialog

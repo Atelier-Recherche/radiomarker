@@ -26,13 +26,16 @@ Ensuite dans REAPER :
 
 ## Export Obsidian (MP3 + Markdown)
 
+**Important :** un rendu manuel (*File → Render*) ne crée **pas** le `.md`. C’est l’action **`export_markers_obsidian`** qui écrit le Markdown (et lance un rendu MP3 seulement si aucun fichier audio récent n’est trouvé).
+
 1. Configure une fois **File → Project render settings** en **MP3** (mixdown / master, toutes les pistes).
 2. Nomme le projet REAPER comme tu veux l’afficher dans la note (`audio_start_time` reprend ce nom ; si le nom est `YYYY-MM-DD HH:MM:SS`, les liens incluent aussi l’horodatage absolu `\[HH:MM:SS]`).
-3. Dans la liste d’actions, lance **`export_markers_obsidian`**.
-4. Fichiers produits dans le dossier du projet (ou dossier saisi si projet non enregistré) :
-   - `{NomDuProjet}.mp3` — rendu fusionné ;
-   - `{NomDuProjet}.md` — frontmatter, embed `![[…mp3]]`, liens `[[…mp3#t=sec|MM:SS]]` par marqueur (cliquables dans Obsidian).
-5. Place le `.mp3` et le `.md` dans le **même dossier** de ton vault Obsidian.
+3. Pose tes marqueurs avec l’interface Radiomarker, puis dans la liste d’actions lance **`export_markers_obsidian`** (une fois le montage terminé).
+4. Si tu as **déjà** rendu en MP3, relance quand même cette action : le script réutilise le dernier fichier de rendu REAPER ou `{NomProjet}.mp3` dans le dossier du projet, et crée le `.md` **à côté** de ce MP3.
+5. Fichiers produits :
+   - `{NomDuProjet}.mp3` (ou le nom choisi au render) — audio fusionné ;
+   - même nom avec extension `.md` — frontmatter, embed `![[…mp3]]`, liens `[[…mp3#t=sec|MM:SS]]` par marqueur (cliquables dans Obsidian).
+6. Place le `.mp3` et le `.md` dans le **même dossier** de ton vault Obsidian.
 
 Les marqueurs Radiomarker (NOMMER, ERREUR, CITATION, etc.) deviennent une ligne de lien chacun ; le libellé est le texte après le dernier `_` dans le nom du marqueur (ex. `Intervenant1_debut` → `debut`). Une ligne vide suit chaque lien pour y ajouter tes notes dans Obsidian.
 
