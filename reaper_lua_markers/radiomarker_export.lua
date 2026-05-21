@@ -12,7 +12,15 @@ function M.join_path(a, b)
 end
 
 function M.trim(s)
-    return (s or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if type(s) ~= "string" then return "" end
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+-- Plusieurs API Reaper renvoient (retval bool, string) en Lua
+function M.reaper_string(first, second)
+    if type(second) == "string" then return second end
+    if type(first) == "string" then return first end
+    return ""
 end
 
 function M.sanitize_filename(name)
@@ -141,14 +149,37 @@ function M.build_markdown_file(project_name, mp3_basename, markers)
     return header .. M.build_markdown_body(mp3_basename, project_name, markers)
 end
 
+function M.api_available(name)
+    if reaper.APIExists then
+        return reaper.APIExists(name)
+    end
+    return reaper[name] ~= nil
+end
+
 function M.get_project_base_name()
     local name = ""
-    if reaper.GetProjectName then
-        name = reaper.GetProjectName(0, "")
+    if M.api_available("GetProjectName") then
+        name = M.reaper_string(reaper.GetProjectName(0, ""))
     end
     name = M.trim(name)
     if name == "" then name = "Untitled" end
     return name
+end
+
+-- Dossier du projet (RPP enregistre) ; API selon version REAPER
+function M.get_project_directory()
+    if M.api_available("GetProjectPathName") then
+        local path = M.trim(M.reaper_string(reaper.GetProjectPathName(0, "")))
+        if path ~= "" then
+            local dir = path:match("^(.*)[/\\][^/\\]+$")
+            if dir and dir ~= "" then return dir end
+            return path
+        end
+    end
+    if M.api_available("GetProjectPath") then
+        return M.trim(M.reaper_string(reaper.GetProjectPath("")))
+    end
+    return ""
 end
 
 function M.basename(path)
@@ -161,55 +192,138 @@ function M.dirname(path)
     return dir or ""
 end
 
-function M.get_last_render_file()
-    local path = reaper.GetSetProjectInfo_String(0, "RENDER_FILE", "", false)
+M.AUDIO_EXTENSIONS = { "mp3", "wav", "flac", "ogg", "m4a", "aiff", "aif" }
+
+function M.is_audio_file(path)
+    if not path or path == "" then return false end
+    local ext = path:match("%.([^.\\/]+)$")
+    if not ext then return false end
+    ext = ext:lower()
+    for i = 1, #M.AUDIO_EXTENSIONS do
+        if ext == M.AUDIO_EXTENSIONS[i] then return true end
+    end
+    return false
+end
+
+function M.get_render_target_path()
+    local path = M.trim(M.reaper_string(reaper.GetSetProjectInfo_String(0, "RENDER_FILE", "", false)))
+    if path == "" then return nil end
+    return path
+end
+
+-- REAPER peut ecrire dans un sous-dossier (ex. .../uio.rpp.mp3/uio.mp3)
+function M.resolve_audio_path(path, base_name)
+    if not path or path == "" then return nil end
     path = M.trim(path)
-    if path ~= "" and reaper.file_exists(path) then
+    if reaper.file_exists(path) and M.is_audio_file(path) then
         return path
+    end
+    if reaper.file_exists(path) then
+        for i = 1, #M.AUDIO_EXTENSIONS do
+            local ext = M.AUDIO_EXTENSIONS[i]
+            local inner = M.join_path(path, base_name .. "." .. ext)
+            if reaper.file_exists(inner) and M.is_audio_file(inner) then
+                return inner
+            end
+        end
     end
     return nil
 end
 
--- MP3 deja present (export manuel ou rendu precedent) : evite un second render
-function M.resolve_mp3_for_export(out_dir, mp3_name)
-    local expected = M.join_path(out_dir, mp3_name)
-    if reaper.file_exists(expected) then
-        return expected, mp3_name
+function M.get_last_render_file(base_name)
+    local target = M.get_render_target_path()
+    if not target then return nil end
+    return M.resolve_audio_path(target, base_name or "")
+end
+
+function M.get_render_directory()
+    if M.api_available("GetSetProjectInfo_String") then
+        local d = M.trim(M.reaper_string(reaper.GetSetProjectInfo_String(0, "RENDER_DIRECTORY", "", false)))
+        if d ~= "" then return d end
     end
-    local last = M.get_last_render_file()
-    if last then
-        local base = M.basename(last)
-        if base:lower():match("%.mp3$") or base:lower():match("%.wav$") or base:lower():match("%.flac$") then
-            return last, base
+    local target = M.get_render_target_path()
+    if target then
+        local dir = M.dirname(target)
+        if dir ~= "" then return dir end
+    end
+    return M.get_project_directory()
+end
+
+function M.get_search_directories(base_name)
+    local dirs = {}
+    local seen = {}
+    local function add(d)
+        d = M.trim(d)
+        if d == "" or seen[d] then return end
+        seen[d] = true
+        dirs[#dirs + 1] = d
+    end
+    local last = M.get_last_render_file(base_name or "")
+    if last then add(M.dirname(last)) end
+    local target = M.get_render_target_path()
+    if target then
+        add(M.dirname(target))
+        add(target)
+    end
+    add(M.get_render_directory())
+    add(M.get_project_directory())
+    return dirs
+end
+
+function M.prompt_audio_file(default_dir)
+    if not reaper.GetUserFileNameForRead then return nil, nil end
+    local initial = default_dir or ""
+    if initial ~= "" and initial:sub(-1) ~= "/" and initial:sub(-1) ~= "\\" then
+        initial = initial .. sep
+    end
+    local ok, file = reaper.GetUserFileNameForRead(
+        "mp3,wav,flac,ogg,m4a,aiff,aif",
+        "Selectionner le fichier audio rendu",
+        initial
+    )
+    file = M.trim(M.reaper_string(ok, file))
+    if file == "" then return nil, nil end
+    if reaper.file_exists(file) and M.is_audio_file(file) then
+        return file, M.basename(file)
+    end
+    return nil, nil
+end
+
+function M.find_audio_in_directory(dir, base_name)
+    for i = 1, #M.AUDIO_EXTENSIONS do
+        local ext = M.AUDIO_EXTENSIONS[i]
+        local p = M.join_path(dir, base_name .. "." .. ext)
+        if reaper.file_exists(p) then
+            return p, M.basename(p)
         end
     end
     return nil, nil
 end
 
-function M.get_output_directory()
-    local last = M.get_last_render_file()
-    if last then
-        local dir = M.dirname(last)
-        if dir ~= "" then return dir end
-    end
-    local proj_path = reaper.GetProjectPathName(0, "")
-    proj_path = M.trim(proj_path)
-    if proj_path ~= "" then
-        local dir = proj_path:match("^(.*)[/\\][^/\\]+$")
-        if dir and dir ~= "" then
-            return dir
+-- Cherche l audio rendu (File > Render) : RENDER_FILE d abord, puis dossiers render REAPER
+function M.find_existing_audio(base_name, default_mp3_name)
+    local target = M.get_render_target_path()
+    if target then
+        local resolved = M.resolve_audio_path(target, base_name)
+        if resolved then
+            return resolved, M.basename(resolved)
         end
     end
-    local ok, ret = reaper.GetUserInputs(
-        "Export Radiomarker",
-        1,
-        "Dossier de sortie (chemin complet):,extrawidth=400",
-        (reaper.GetResourcePath() or ""):gsub("/", sep)
-    )
-    if not ok then return nil end
-    local dir = M.trim(ret)
-    if dir == "" then return nil end
-    return dir
+
+    local last = M.get_last_render_file(base_name)
+    if last then
+        return last, M.basename(last)
+    end
+
+    local dirs = M.get_search_directories(base_name)
+    for i = 1, #dirs do
+        local path, name = M.find_audio_in_directory(dirs[i], base_name)
+        if path then return path, name end
+        path = M.resolve_audio_path(dirs[i], base_name)
+        if path then return path, M.basename(path) end
+    end
+
+    return nil, nil
 end
 
 function M.write_utf8(path, content)
@@ -222,30 +336,32 @@ end
 
 -- Render projet vers path (format MP3 via reglages render du projet)
 function M.md_path_for_mp3(mp3_path)
-    return (mp3_path:gsub("%.[^%.\\\/]+$", "") or mp3_path) .. ".md"
+    local i = mp3_path:find("%.[^%.\\/]+$")
+    if i then
+        return mp3_path:sub(1, i - 1) .. ".md"
+    end
+    return mp3_path .. ".md"
 end
 
-function M.render_project_to_file(output_path)
-    reaper.GetSetProjectInfo_String(0, "RENDER_FILE", output_path, true)
-    reaper.Main_OnCommand(42230, 0) -- Render project, recent settings, auto-close dialog
-    local t0 = reaper.time_precise and reaper.time_precise() or 0
-    if reaper.GetRenderState then
-        while reaper.GetRenderState() ~= 0 do
-            if reaper.time_precise and reaper.time_precise() - t0 > 3600 then
-                return false, "Delai de rendu depasse."
-            end
-        end
+function M.write_markdown_export(project_name, mp3_path, mp3_name, used_existing)
+    local md_path = M.md_path_for_mp3(mp3_path)
+    local markers = M.collect_markers()
+    local md_content = M.build_markdown_file(project_name, mp3_name, markers)
+    if not M.write_utf8(md_path, md_content) then
+        return false, "Impossible d'ecrire:\n" .. md_path
     end
-    local deadline = t0 + 120
-    while not reaper.file_exists(output_path) do
-        if reaper.time_precise and reaper.time_precise() > deadline then
-            return false, "Fichier MP3 introuvable apres rendu. Verifie File > Project render settings (format MP3)."
-        end
-        if not reaper.time_precise then break end
-    end
-    if not reaper.file_exists(output_path) then
-        return false, "Fichier MP3 introuvable apres rendu. Verifie File > Project render settings (format MP3)."
-    end
+    local render_note = used_existing and "Audio existant reutilise (pas de nouveau rendu).\n\n"
+        or "Audio rendu par ce script.\n\n"
+    reaper.ShowMessageBox(
+        "Export termine.\n\n" ..
+        render_note ..
+        "Audio :\n" .. mp3_path .. "\n\n" ..
+        "Markdown :\n" .. md_path .. "\n\n" ..
+        "Marqueurs : " .. tostring(#markers) .. "\n\n" ..
+        "Copie les deux fichiers dans ton vault Obsidian (meme dossier que la note).",
+        "Export Obsidian",
+        0
+    )
     return true
 end
 
