@@ -1,8 +1,8 @@
-# Radiomarker 1.0.3
+# Radiomarker 1.0.4
 
 ## Changements
 
-ee8e06f Update README and Lua scripts for Obsidian export process
+6854dac Update README and Lua scripts for Obsidian export process
 
 
 ## Fichier
