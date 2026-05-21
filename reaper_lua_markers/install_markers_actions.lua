@@ -29,7 +29,8 @@ local files = {
     "p1_erreur.lua", "p1_citation.lua", "p1_note.lua", "p1_nommer.lua",
     "p2_erreur.lua", "p2_citation.lua", "p2_note.lua", "p2_nommer.lua",
     "p3_erreur.lua", "p3_citation.lua", "p3_note.lua", "p3_nommer.lua",
-    "p4_erreur.lua", "p4_citation.lua", "p4_note.lua", "p4_nommer.lua"
+    "p4_erreur.lua", "p4_citation.lua", "p4_note.lua", "p4_nommer.lua",
+    "export_markers_obsidian.lua"
 }
 
 local missing = {}
