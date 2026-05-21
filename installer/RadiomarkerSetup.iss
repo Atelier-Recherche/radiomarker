@@ -3,7 +3,7 @@
 ; Sortie : ..\dist\RadiomarkerSetup.exe (voir OutputDir ci-dessous).
 
 #define MyAppName "Radiomarker"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "Radiomarker"
 
 [Setup]
